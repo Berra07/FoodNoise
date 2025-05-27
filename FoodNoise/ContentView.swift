@@ -1,8 +1,9 @@
+// ContentView.swift
 import SwiftUI
 import AVFoundation
+import UserNotifications
 
-
-struct MainView: View {
+struct ContentView: View {
     var body: some View {
         TabView {
             BuzzerView()
@@ -14,10 +15,16 @@ struct MainView: View {
                 .tabItem {
                     Label("Challenges", systemImage: "target")
                 }
+
+            MindfulnessView()
+                .tabItem {
+                    Label("Mindfulness", systemImage: "brain.head.profile")
+                }
         }
     }
 }
 
+// MARK: - BuzzerView
 struct BuzzerView: View {
     @State private var quote = "Drück auf den Buzzer!"
     @State private var player: AVAudioPlayer?
@@ -85,6 +92,7 @@ struct BuzzerView: View {
     }
 }
 
+// MARK: - ChallengeView
 struct ChallengeView: View {
     @State private var currentChallenge = "Drück auf den Button für deine Ablenkungs-Challenge!"
     @State private var timeRemaining = 180
@@ -190,5 +198,119 @@ struct ChallengeView: View {
 
     func resetTimer() {
         stopTimer()
+    }
+}
+
+// MARK: - MindfulnessView
+struct MindfulnessStep: Identifiable, Codable {
+    let id = UUID()
+    let title: String
+    let description: String
+    var journalEntry: String = ""
+}
+
+class MindfulnessViewModel: ObservableObject {
+    @Published var steps: [MindfulnessStep] = [
+        MindfulnessStep(title: "1. Notice the Urge", description: "Become aware of what triggers your habit. Is it stress? Boredom? A craving? Notice it without judging."),
+        MindfulnessStep(title: "2. Get Curious", description: "Don't resist the urge. Just explore it. What does it feel like in your body? What do you really get out of the habit?"),
+        MindfulnessStep(title: "3. Feel the Joy of Letting Go", description: "By becoming aware instead of reacting, you create space. And in that space, joy arises. This is freedom."),
+        MindfulnessStep(title: "4. Repeat to Find Freedom", description: "Every time you repeat this mindful loop, you weaken the habit's grip. Over time, you transform.")
+    ]
+
+    @Published var currentStepIndex: Int = 0
+    @Published var history: [String] = []
+
+    func nextStep() {
+        if currentStepIndex < steps.count - 1 {
+            currentStepIndex += 1
+        } else {
+            history.append("Completed on \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short))")
+            currentStepIndex = 0
+        }
+    }
+}
+
+struct MindfulnessView: View {
+    @StateObject private var viewModel = MindfulnessViewModel()
+
+    var body: some View {
+        let step = viewModel.steps[viewModel.currentStepIndex]
+
+        VStack(spacing: 30) {
+            Text(step.title)
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+                .padding(.top, 40)
+
+            Text(step.description)
+                .font(.title3)
+                .padding()
+                .multilineTextAlignment(.center)
+                .background(Color.pink.opacity(0.1))
+                .cornerRadius(20)
+                .padding(.horizontal)
+
+            TextEditor(text: Binding(
+                get: { viewModel.steps[viewModel.currentStepIndex].journalEntry },
+                set: { viewModel.steps[viewModel.currentStepIndex].journalEntry = $0 }
+            ))
+            .frame(height: 150)
+            .padding()
+            .background(Color.white)
+            .cornerRadius(10)
+            .shadow(radius: 5)
+
+            Button(action: viewModel.nextStep) {
+                Text(viewModel.currentStepIndex < viewModel.steps.count - 1 ? "Next" : "Finish & Save")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.pink)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+            }
+
+            List {
+                Section(header: Text("History")) {
+                    ForEach(viewModel.history, id: \ .self) { item in
+                        Text(item)
+                    }
+                }
+            }
+            .frame(height: 150)
+
+            Spacer()
+        }
+        .padding()
+        .onAppear {
+            NotificationManager.shared.scheduleDailyReminder()
+        }
+    }
+}
+
+// MARK: - NotificationManager
+class NotificationManager {
+    static let shared = NotificationManager()
+
+    func scheduleDailyReminder() {
+        let center = UNUserNotificationCenter.current()
+
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            if granted {
+                let content = UNMutableNotificationContent()
+                content.title = "Mindfulness Time 🧘‍♀️"
+                content.body = "Take 5 minutes to observe, get curious, and journal."
+
+                var dateComponents = DateComponents()
+                dateComponents.hour = 9
+
+                let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+
+                let request = UNNotificationRequest(identifier: "daily_mindfulness", content: content, trigger: trigger)
+                center.add(request)
+            }
+        }
     }
 }

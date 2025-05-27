@@ -11,7 +11,7 @@ import SwiftUI
 struct FoodNoiseApp: App {
     var body: some Scene {
         WindowGroup {
-            MainView() // <- das ist der neue Startbildschirm
+            ContentView() // <- das ist der neue Startbildschirm
         }
     }
 }
